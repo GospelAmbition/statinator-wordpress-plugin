@@ -52,12 +52,14 @@ function go_analytics_script_attributes( $tag, $handle, $src ) {
 
     $project_id = defined( 'GO_ANALYTICS_PROJECT_ID' ) ? GO_ANALYTICS_PROJECT_ID : '';
     $storage = defined( 'GO_ANALYTICS_STORAGE_MODE' ) ? GO_ANALYTICS_STORAGE_MODE : 'session';
+    $hash_key = defined( 'GO_ANALYTICS_HASH_KEY' ) ? GO_ANALYTICS_HASH_KEY : '';
 
-    $tag = str_replace(
-        ' src=',
-        ' data-project="' . esc_attr( $project_id ) . '" data-storage="' . esc_attr( $storage ) . '" src=',
-        $tag
-    );
+    $attrs = ' data-project="' . esc_attr( $project_id ) . '" data-storage="' . esc_attr( $storage ) . '"';
+    if ( ! empty( $hash_key ) ) {
+        $attrs .= ' data-hash-key="' . esc_attr( $hash_key ) . '"';
+    }
+
+    $tag = str_replace( ' src=', $attrs . ' src=', $tag );
 
     return $tag;
 }
@@ -81,14 +83,16 @@ function go_analytics_track( string $event_type, array $metadata = [], $value = 
     }
 
     $language = go_analytics_get_language();
+    $anonymous_hash = apply_filters( 'go_analytics_anonymous_hash', null );
 
     $payload = [
-        'project_id' => $project_id,
-        'event_type' => $event_type,
-        'hostname'   => wp_parse_url( home_url(), PHP_URL_HOST ),
-        'language'   => $language,
-        'metadata'   => ! empty( $metadata ) ? $metadata : null,
-        'value'      => $value,
+        'project_id'     => $project_id,
+        'event_type'     => $event_type,
+        'hostname'       => wp_parse_url( home_url(), PHP_URL_HOST ),
+        'language'       => $language,
+        'anonymous_hash' => $anonymous_hash ?: null,
+        'metadata'       => ! empty( $metadata ) ? $metadata : null,
+        'value'          => $value,
     ];
 
     $url = rtrim( $endpoint, '/' ) . '/api/events';
