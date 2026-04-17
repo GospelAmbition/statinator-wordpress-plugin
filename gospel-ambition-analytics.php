@@ -85,12 +85,22 @@ function go_analytics_track( string $event_type, array $metadata = [], $value = 
     $language = go_analytics_get_language();
     $anonymous_hash = apply_filters( 'go_analytics_anonymous_hash', null );
 
+    $user_hash = null;
+    $user_id = get_current_user_id();
+    if ( $user_id ) {
+        $user = get_userdata( $user_id );
+        if ( $user ) {
+            $user_hash = hash( 'sha256', strtolower( $user->user_email ) );
+        }
+    }
+
     $payload = [
         'project_id'     => $project_id,
         'event_type'     => $event_type,
         'hostname'       => wp_parse_url( home_url(), PHP_URL_HOST ),
         'language'       => $language,
         'anonymous_hash' => $anonymous_hash ?: null,
+        'user_hash'      => $user_hash,
         'metadata'       => ! empty( $metadata ) ? $metadata : null,
         'value'          => $value,
     ];
