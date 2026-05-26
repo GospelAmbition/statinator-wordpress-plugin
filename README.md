@@ -9,7 +9,8 @@ Thin wrapper — API key stored in `wp-config.php`, no admin UI.
 1. **Enqueues the frontend tracking script** on every page with the configured `data-project` and `data-storage` attributes.
 2. **Provides `go_analytics_track()`** — a global PHP function for sending server-side events to the Statinator API (non-blocking).
 3. **Auto-tracks login and registration** via `wp_login` and `user_register`, sending an `email_hash` for cross-project user linking.
-4. **Fires the `go_analytics_event` action** so other plugins can listen for analytics events.
+4. **Forwards the visitor's geo in the request body** — reads Cloudflare headers off the inbound request and packs them into `body.geo` so server-relayed events land with the real user's country/IP, not the WordPress host's datacenter.
+5. **Fires the `go_analytics_event` action** so other plugins can listen for analytics events.
 
 ## Installation
 
@@ -48,7 +49,9 @@ go_analytics_track('campaign_created', ['campaign_id' => $post_id]);
 go_analytics_track('newsletter_signup');
 ```
 
-The function attaches `hostname`, `language` (Polylang-aware, falls back to WP locale), and a SHA-256 `user_hash` of the logged-in user's email when available. The `anonymous_hash` value can be supplied via the `go_analytics_anonymous_hash` filter.
+The function attaches `hostname`, `language` (Polylang-aware, falls back to WP locale), a SHA-256 `user_hash` of the logged-in user's email when available, and a `geo` object built from the current request's Cloudflare headers (`HTTP_CF_CONNECTING_IP`, `HTTP_CF_IPCOUNTRY`, etc.). The `anonymous_hash` value can be supplied via the `go_analytics_anonymous_hash` filter.
+
+> **Note on geo:** Statinator sits behind Cloudflare. Without `body.geo`, server-relayed events from the WordPress host would all land tagged with the host's datacenter location (Cloudflare regenerates `cf-*` from the connecting IP — which is your WP server, not the user). The plugin sends `body.geo` automatically; Statinator's `/api/events` honors it for api-key-authenticated callers. No action needed on your part — it just works as long as your site is behind Cloudflare.
 
 ### Listening for events
 
