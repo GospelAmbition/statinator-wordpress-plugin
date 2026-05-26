@@ -3,7 +3,7 @@
  * Plugin Name: Gospel Ambition Analytics
  * Plugin URI: https://github.com/GospelAmbition/statinator-wordpress-plugin
  * Description: Connects to the Statinator analytics server for event tracking.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: Gospel Ambition
  * Author URI: https://gospelambition.org
  * License: GPL-2.0+
@@ -103,6 +103,7 @@ function go_analytics_track( string $event_type, array $metadata = [], $value = 
         'user_hash'      => $user_hash,
         'metadata'       => ! empty( $metadata ) ? $metadata : null,
         'value'          => $value,
+        'geo'            => go_analytics_build_geo(),
     ];
 
     $url = rtrim( $endpoint, '/' ) . '/api/events';
@@ -118,6 +119,41 @@ function go_analytics_track( string $event_type, array $metadata = [], $value = 
     ] );
 
     do_action( 'go_analytics_event', $event_type, $metadata, $value );
+}
+
+/**
+ * Build the client-geo payload from Cloudflare request headers.
+ *
+ * Statinator sits behind Cloudflare. For server-relayed events, CF on the
+ * Statinator zone sees the WordPress server (not the user) as the connecting
+ * client and would otherwise inject the datacenter's geo. By packing the
+ * original visitor's `cf-*` headers into the JSON body, Statinator's geo.ts
+ * honors them as the trusted source (gated on api-key auth on its side).
+ *
+ * Returns null when no CF headers are present (e.g. local/dev), letting the
+ * receiver fall back to its default behavior.
+ */
+function go_analytics_build_geo(): ?array {
+    $geo = [];
+    if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
+        $geo['ip'] = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) );
+    }
+    if ( ! empty( $_SERVER['HTTP_CF_IPCOUNTRY'] ) ) {
+        $geo['country'] = substr( sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_IPCOUNTRY'] ) ), 0, 3 );
+    }
+    if ( ! empty( $_SERVER['HTTP_CF_IPREGION'] ) ) {
+        $geo['region'] = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_IPREGION'] ) );
+    }
+    if ( ! empty( $_SERVER['HTTP_CF_IPCITY'] ) ) {
+        $geo['city'] = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_IPCITY'] ) );
+    }
+    if ( ! empty( $_SERVER['HTTP_CF_IPLATITUDE'] ) ) {
+        $geo['lat'] = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_IPLATITUDE'] ) );
+    }
+    if ( ! empty( $_SERVER['HTTP_CF_IPLONGITUDE'] ) ) {
+        $geo['lon'] = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_IPLONGITUDE'] ) );
+    }
+    return ! empty( $geo ) ? $geo : null;
 }
 
 /**
